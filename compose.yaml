@@ -1,0 +1,57 @@
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    networks:
+      - plaiground
+    depends_on:
+      database:
+        condition: service_healthy
+    profiles:
+      - full
+
+  database:
+    image: postgres:18-alpine
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "5432"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - plaiground
+    profiles:
+      - full
+      - db
+
+  adminer:
+    image: adminer:6.1.2-standalone
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: database
+    networks:
+      - plaiground
+    depends_on:
+      database:
+        condition: service_healthy
+    profiles:
+      - full
+      - db
+
+volumes:
+  postgres_data:
+
+networks:
+  plaiground:
