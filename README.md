@@ -22,7 +22,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Docker
 
-For local development, copy `.env.example` to `.env`, then run:
+For local development, copy `example.env` to `.env`, then run:
 
 ```bash
 docker compose --profile db up -d
@@ -30,10 +30,9 @@ npm run dev
 ```
 
 Next.js uses `DATABASE_URL` from `.env` to connect to `localhost:5432`.
-Use this variable in your server-side database client. PostgreSQL's image does
-not initialize from a connection URL, so Compose sets its `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, and `POSTGRES_DB` directly to local development defaults.
-If you change the credentials, update both Compose and `DATABASE_URL`.
+PostgreSQL's image does not initialize from a connection URL, so `.env` also sets
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` for the container.
+If you change the credentials, update these variables and `DATABASE_URL` together.
 Initialization settings only apply to an empty database volume.
 
 Adminer is available at http://localhost:8080 with server `database`.
@@ -44,8 +43,9 @@ To run the app and database together in Docker:
 docker compose --profile full up -d --build
 ```
 
-Compose overrides the frontend's `DATABASE_URL` to use hostname `database`, which
-is reachable from the app container. The named volume preserves PostgreSQL data.
+Set the hostname in `.env`'s `DATABASE_URL` to `database` when running the app
+inside Compose, and use `localhost` for commands running on the host.
+The named volume preserves PostgreSQL data.
 
 Build and run the production image:
 
@@ -58,6 +58,43 @@ Open [http://localhost:3000](http://localhost:3000). To supply runtime environme
 variables, add `--env-file .env` to `docker run` before the image name. Environment
 files are excluded from the image build context. `NEXT_PUBLIC_*` variables are
 inlined during the build and cannot be changed at runtime.
+
+## Database (Drizzle)
+
+The PostgreSQL setup follows the [Drizzle getting started guide](https://orm.drizzle.team/docs/get-started/postgresql-new)
+using `node-postgres`. Table definitions live in `db/schema.ts`, Drizzle Kit
+configuration in `drizzle.config.ts`. The schema starts empty, with no tables or
+pre-created migrations. Future generated SQL migrations will live in `drizzle/`.
+
+When you need your first table, define and export it from `db/schema.ts`. With
+`DATABASE_URL` configured for your host and PostgreSQL running, generate and
+review the migration before applying it:
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+Commit the generated SQL and snapshots in `drizzle/`. `npm run db:push` is available
+for disposable local databases; it changes the database without creating migration
+files. `npm run db:studio` opens Drizzle Studio. Migrations are run separately from
+application startup, using a development or deployment environment with the dev
+dependencies installed.
+
+Use `getDb()` only from Server Components, Route Handlers, or other server code
+running in the Node.js runtime:
+
+```ts
+import { getDb } from "@/db";
+
+const db = getDb();
+// Query your tables here after defining them in db/schema.ts.
+```
+
+The server-only database module creates its connection pool on first use and
+reuses it across development hot reloads. Next.js loads `.env` for the app;
+Drizzle Kit loads it through `dotenv`. Keep `DATABASE_URL` private and unprefixed
+by `NEXT_PUBLIC_`.
 
 ## Commit messages
 
